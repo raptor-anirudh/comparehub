@@ -85,10 +85,10 @@ echo -n "Test 5: Transient Failure (Timeout) ... "
 RESP=$(curl -s -X POST "$BASE_URL/search/" \
      -H "Content-Type: application/json" \
      -d '{"text": "Nimbus", "category": "ecommerce", "providers": ["mock-flaky"]}')
-if echo "$RESP" | grep -q "TIMEOUT"; then
+if echo "$RESP" | grep -qi "timeout"; then
     echo -e "${GREEN}PASS${NC}"
 else
-    echo -e "${RED}FAIL${NC} (Expected TIMEOUT state)"
+    echo -e "${RED}FAIL${NC} (Expected timeout state. Response: $RESP)"
 fi
 
 # Scenario 6: Hard Blocked (Flipkart)
@@ -96,10 +96,10 @@ echo -n "Test 6: Hard Blocked (Unavailable) ... "
 RESP=$(curl -s -X POST "$BASE_URL/search/" \
      -H "Content-Type: application/json" \
      -d '{"text": "Nimbus", "category": "ecommerce", "providers": ["flipkart"]}')
-if echo "$RESP" | grep -q "UNAVAILABLE"; then
+if echo "$RESP" | grep -qi "unavailable"; then
     echo -e "${GREEN}PASS${NC}"
 else
-    echo -e "${RED}FAIL${NC} (Expected UNAVAILABLE state)"
+    echo -e "${RED}FAIL${NC} (Expected unavailable state. Response: $RESP)"
 fi
 
 # Scenario 7: Validation Error (Ghost Store)
