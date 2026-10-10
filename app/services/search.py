@@ -99,19 +99,26 @@ class SearchService:
                 if resolved:
                     selection = resolved
                 else:
-                    # Use all enabled providers
+                    # Use all enabled providers: pass empty tuple to registry
                     selection = ProviderSelection(provider_ids=())
             else:
-                # Default to empty selection (SearchService.resolve handles this as 'all enabled')
+                # Default to empty selection
                 selection = ProviderSelection(provider_ids=())
 
-        adapters = self._registry.resolve(selection.provider_ids, query.category)
+        try:
+            # If provider_ids is empty, resolve() should be updated to return all enabled
+            adapters = self._registry.resolve(selection.provider_ids, query.category)
+        except Exception as exc:
+            # Re-raise as ValueError so the API layer returns 422 instead of 500
+            raise ValueError(str(exc)) from exc
+
         semaphore = asyncio.Semaphore(self._config.max_concurrency)
         async with asyncio.TaskGroup() as group:
             tasks = [
                 group.create_task(self._search_one(a, query.product, semaphore)) for a in adapters
             ]
         outcomes = [t.result() for t in tasks]  # selection order, hence deterministic
+
 
         collected = [r for o in outcomes for r in o.results]
         eligible, excluded = apply_hard_filters(collected, query.product)

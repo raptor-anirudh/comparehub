@@ -44,8 +44,17 @@ class ProviderRegistry:
     def resolve(self, provider_ids: tuple[str, ...], category: Category) -> list[ProviderAdapter]:
         """Return adapters for the selection, preserving the user's order.
 
+        If provider_ids is empty, returns all enabled providers that support the category.
+
         Raises ProviderSelectionError listing every unusable provider at once.
         """
+        if not provider_ids:
+            return [
+                adapter for adapter in self._adapters.values()
+                if adapter.provider.status == ProviderStatus.ENABLED
+                and adapter.provider.capability_for(category) is not None
+            ]
+
         adapters: list[ProviderAdapter] = []
         issues: list[SelectionIssue] = []
         for pid in provider_ids:
