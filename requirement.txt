@@ -1,0 +1,11 @@
+# Core Dependencies
+fastapi
+uvicorn[standard]
+aiosqlite
+pydantic
+
+# Development & Testing
+pytest
+pytest-asyncio
+ruff
+mypy

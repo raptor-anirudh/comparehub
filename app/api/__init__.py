@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.providers.registry import ProviderRegistry
-from app.providers.defaults import default_registry
+from app.providers.defaults import build_default_registry
 from app.services.search import SearchService, SearchConfig
 from app.repositories.sqlite_user_repo import SQLiteUserRepository
 from app.services.user_service import UserService
@@ -15,7 +15,7 @@ from app.services.user_service import UserService
 # or a container, but for this phase, a simple singleton approach works.
 class AppState:
     def __init__(self):
-        self.registry = default_registry
+        self.registry = build_default_registry()
         self.search_service = SearchService(self.registry)
         self.user_repo = SQLiteUserRepository("comparehub.db")
         self.user_service = UserService(self.user_repo)
