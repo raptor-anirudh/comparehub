@@ -24,4 +24,4 @@ per-provider status -> normalize -> match -> filter -> rank -> respond.
   eligible items.
 
 ## Rationale for deviations from the suggested layout
-None yet. Phase 1 uses the suggested layout under `app/`.
+Phase 1 follows the suggested layout under `app/`; domain models live in `app/domain/{products,providers,comparisons}/models.py`.
