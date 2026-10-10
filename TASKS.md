@@ -1,6 +1,6 @@
 # TASKS
 
-**Current phase:** 1 complete -> next: Phase 2 (search orchestration)
+**Current phase:** 2 complete -> next: Phase 3 (database + preferences)
 
 ## Environment facts (verified 2026-10-10)
 - Python 3.12.3, Node 22, Git 2.43 available.
@@ -36,8 +36,19 @@
   SSRF controls are Phase 10 work.
 - Docker, Postgres, and Next.js are untested (not installed / not started here).
 
+## Phase 2 — Search orchestration  [DONE, verified 2026-10-10]
+- [x] SearchService (concurrent fan-out, per-provider timeout, concurrency cap, bounded retries)
+- [x] Failure isolation + error taxonomy (SearchState), cancellation propagation
+- [x] Hard filters re-enforced in service (budget, required attributes); filtered_out_count
+- [x] Structured logging without query text
+- [x] Acceptance: 3 providers, 1 timeout -> valid results from the others (test passes)
+- Verified: pytest 84 passed (30 new), ruff check/format clean, mypy strict clean,
+  0/15 failures on repeated runs of the timing-sensitive tests.
+- Limitations: see docs/architecture.md "Search orchestration". mypy covers `app/` only
+  (tests are linted but not type-checked). No JSON log formatter yet (Phase 12).
+
 ## Later phases
-2 Search orchestration · 3 DB/preferences · 4 API · 5 Real provider ·
+3 DB/preferences · 4 API · 5 Real provider ·
 6 Matching · 7 AI query parsing · 8 Ranking · 9 Frontend · 10 Security ·
 11 Test/eval · 12 Observability · 13 Docker/CI · 14 Docs
 

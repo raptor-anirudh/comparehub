@@ -53,6 +53,9 @@ class SearchResponse(BaseModel):
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     results: tuple[ProductResult, ...] = ()
     provider_statuses: tuple[ProviderSearchStatus, ...] = ()
+    # Listings returned by providers but removed by hard filters (budget, required
+    # attributes). Surfaced so exclusions are never invisible to the user.
+    filtered_out_count: int = Field(default=0, ge=0)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
