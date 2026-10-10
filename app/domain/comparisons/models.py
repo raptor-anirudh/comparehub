@@ -40,7 +40,9 @@ class SearchQuery(BaseModel):
 
     category: Category
     product: ProductQuery
-    selection: ProviderSelection
+    # Selection is now optional. If omitted, the SearchService resolves
+    # it via UserPreferences or global defaults.
+    selection: ProviderSelection | None = None
     preference: ComparisonPreference = Field(default_factory=ComparisonPreference)
 
 
@@ -67,6 +69,7 @@ class SearchResponse(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_failed(self) -> bool:
+        """True when every selected provider failed to return usable data."""
         ok = {SearchState.SUCCESS, SearchState.EMPTY}
         return bool(self.provider_statuses) and all(
             s.state not in ok for s in self.provider_statuses

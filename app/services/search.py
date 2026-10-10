@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from app.domain.comparisons.models import ProductQuery, SearchQuery, SearchResponse
 from app.domain.enums import SearchState
 from app.domain.products.models import ProductResult
-from app.domain.providers.models import ProviderSearchStatus
+from app.domain.providers.models import ProviderSearchStatus, ProviderSelection
 from app.providers.base import (
     ProviderAdapter,
     ProviderError,
@@ -72,14 +72,36 @@ class SearchService:
         self._config = config or SearchConfig()
         self._sleep = sleep
 
-    async def search(self, query: SearchQuery) -> SearchResponse:
+    async def search(
+        self,
+        query: SearchQuery,
+        user_id: str | None = None,
+        user_service: 'UserService' | None = None
+    ) -> SearchResponse:
         """Run one search.
+
+        If query.selection is omitted, providers are resolved via user_service
+        using the provided user_id. If both are missing, all enabled providers are used.
 
         Raises ProviderSelectionError (a ValueError) if the selection is invalid; the
         API layer maps that to a 422. Provider-level failures never raise.
         Cancelling the caller cancels all in-flight provider calls.
         """
-        adapters = self._registry.resolve(query.selection.provider_ids, query.category)
+        # Resolve effective provider selection
+        selection = query.selection
+        if selection is None:
+            if user_service:
+                # Extract explicit selection from query if it were partially present
+                # (though in our model it's all or nothing).
+                selection = await user_service.get_effective_providers(
+                    user_id=user_id,
+                    explicit_selection=None
+                )
+            else:
+                # Default to empty selection (SearchService.resolve handles this as 'all enabled')
+                selection = ProviderSelection(provider_ids=())
+
+        adapters = self._registry.resolve(selection.provider_ids, query.category)
         semaphore = asyncio.Semaphore(self._config.max_concurrency)
         async with asyncio.TaskGroup() as group:
             tasks = [

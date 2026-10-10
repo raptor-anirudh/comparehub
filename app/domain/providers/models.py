@@ -51,7 +51,7 @@ class ProviderSelection(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    provider_ids: tuple[str, ...] = Field(min_length=1, max_length=20)
+    provider_ids: tuple[str, ...] = Field(min_length=0, max_length=20)
 
     @field_validator("provider_ids")
     @classmethod
