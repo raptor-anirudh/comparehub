@@ -16,12 +16,12 @@ class UserService:
         self,
         user_id: UserId | None,
         explicit_selection: list[str] | None
-    ) -> ProviderSelection:
+    ) -> ProviderSelection | None:
         """
         Determines which providers to use for a search based on priority:
         1. Explicitly provided IDs in the request.
         2. User's saved preferences (if logged in).
-        3. Global defaults (empty selection signals the SearchService to use all enabled).
+        3. Global defaults (return None to signal 'all enabled').
         """
         # 1. Explicit selection takes absolute priority
         if explicit_selection:
@@ -33,15 +33,8 @@ class UserService:
             if prefs.preferred_provider_ids:
                 return ProviderSelection(provider_ids=tuple(prefs.preferred_provider_ids))
 
-        # 3. Return empty selection to indicate "use all enabled providers"
-        # Note: ProviderSelection requires min_length=1 in its Pydantic model.
-        # To support "all", we can return a special signal or let the SearchService
-        # handle a None/Empty case. For now, we'll allow an empty tuple if we
-        # modify the model, or return a default selection.
-        #
-        # Given the domain model constraint, we'll return a selection
-        # that the SearchService knows how to interpret as 'default'.
-        return ProviderSelection(provider_ids=()) # This will fail Pydantic validation if not handled.
+        # 3. Return None to indicate "use all enabled providers"
+        return None
 
     async def set_preferences(self, user_id: UserId, provider_ids: list[str]) -> None:
         """Save a user's preferred provider list."""

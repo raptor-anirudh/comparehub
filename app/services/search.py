@@ -89,14 +89,18 @@ class SearchService:
         """
         # Resolve effective provider selection
         selection = query.selection
-        if selection is None:
+        if selection is None or not selection.provider_ids:
             if user_service:
-                # Extract explicit selection from query if it were partially present
-                # (though in our model it's all or nothing).
-                selection = await user_service.get_effective_providers(
+                # Resolve via preferences if no explicit selection was provided
+                resolved = await user_service.get_effective_providers(
                     user_id=user_id,
                     explicit_selection=None
                 )
+                if resolved:
+                    selection = resolved
+                else:
+                    # Use all enabled providers
+                    selection = ProviderSelection(provider_ids=())
             else:
                 # Default to empty selection (SearchService.resolve handles this as 'all enabled')
                 selection = ProviderSelection(provider_ids=())

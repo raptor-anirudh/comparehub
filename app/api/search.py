@@ -59,12 +59,12 @@ async def search(
         selection = ProviderSelection(provider_ids=tuple(req.providers))
 
     # 2. Build the SearchQuery
-    # We provide a default empty selection if none is resolved yet;
-    # SearchService will handle the resolution via UserService.
+    # We pass the selection if provided, otherwise None.
+    # The SearchService handles the resolution of None via UserService.
     query = SearchQuery(
         category=category,
         product=product_query,
-        selection=selection or ProviderSelection(provider_ids=()),
+        selection=selection,
     )
 
     # 3. Execute search via service
