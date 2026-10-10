@@ -160,7 +160,7 @@ _STOCK = {"yes": StockStatus.IN_STOCK, "few": StockStatus.LIMITED, "no": StockSt
 class MockAlphaAdapter(_MockEcommerceAdapter):
     """Raw schema A: `mrp_inr` and `ship_fee_inr` as strings; full policy data."""
 
-    _default_id = "mock-alpha"
+    _default_id = "alpha"
     _default_name = "Mock Store Alpha (demo)"
     _supported_filters = frozenset({"max_price"})
 
@@ -250,7 +250,7 @@ class MockAlphaAdapter(_MockEcommerceAdapter):
 class MockBetaAdapter(_MockEcommerceAdapter):
     """Raw schema B: `price`, `shipping` ('free' | 'unknown' | amount), sparse policy data."""
 
-    _default_id = "mock-beta"
+    _default_id = "beta"
     _default_name = "Mock Store Beta (demo)"
 
     def _raw_catalog(self) -> list[dict[str, Any]]:
