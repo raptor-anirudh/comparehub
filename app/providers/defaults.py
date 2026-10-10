@@ -8,13 +8,16 @@ from app.providers.mock.ecommerce import (
     MockFailureMode,
     UnavailableProviderAdapter,
 )
+from app.providers.flipkart import FlipkartAdapter
 from app.providers.registry import ProviderRegistry
+
 
 
 def build_default_registry() -> ProviderRegistry:
     registry = ProviderRegistry()
     registry.register(MockAlphaAdapter())
     registry.register(MockBetaAdapter())
+    registry.register(FlipkartAdapter())
     # Always-failing demo provider so partial-failure handling is visible in the UI.
     registry.register(
         MockAlphaAdapter(
