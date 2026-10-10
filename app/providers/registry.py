@@ -62,13 +62,12 @@ class ProviderRegistry:
             if adapter is None:
                 issues.append(SelectionIssue(pid, "unknown", "provider is not registered"))
                 continue
-            provider = adapter.provider
-            if provider.status is ProviderStatus.DISABLED:
-                issues.append(SelectionIssue(pid, "disabled", "provider is disabled"))
-            elif provider.status is ProviderStatus.UNAVAILABLE:
-                reason = provider.unavailable_reason or "no reason given"
-                issues.append(SelectionIssue(pid, "unavailable", f"provider unavailable: {reason}"))
-            elif provider.capability_for(category) is None:
+
+            # We ALWAYS return the adapter if it was explicitly requested,
+            # even if it is DISABLED or UNAVAILABLE.
+            # This allows the SearchService to record the specific failure state.
+            # The only case we might filter here is if it doesn't support the category at all.
+            if adapter.provider.capability_for(category) is None:
                 issues.append(
                     SelectionIssue(
                         pid, "unsupported_category", f"does not support {category.value}"
@@ -76,6 +75,7 @@ class ProviderRegistry:
                 )
             else:
                 adapters.append(adapter)
+
         if issues:
             raise ProviderSelectionError(issues)
         return adapters
