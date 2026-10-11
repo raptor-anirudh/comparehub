@@ -56,27 +56,80 @@ class FlipkartAdapter(ProviderAdapter):
             page = await context.new_page()
 
             try:
-                # Increased timeout to 30s to handle heavy page loads
+                # 1. Navigate with a generous timeout
                 await page.goto(url, wait_until="domcontentloaded", timeout=30000)
 
-                # Wait for at least one product card to appear before continuing.
-                # This ensures the JS has actually rendered the results.
-                try:
-                    await page.wait_for_selector('div[class*="_cgRdT"], div[class*="_1AtV5S"]', timeout=10000)
-                except Exception:
-                    # If no products are found, we still want to save the HTML for debugging
-                    pass
-
-                # DIAGNOSTIC: Save HTML immediately after load
+                # 2. Immediate capture of HTML for debugging
                 content = await page.content()
                 with open("flipkart_debug.html", "w", encoding="utf-8") as f:
                     f.write(content)
 
-                # Basic check for blocking/captcha
+                # 3. Basic check for blocking/captcha
                 if "captcha" in content.lower():
                     raise ProviderUnavailableError("Flipkart blocked the request with a CAPTCHA")
 
-                # Extract product containers
+                # 4. Wait for potential results to render
+                try:
+                    await page.wait_for_selector('div[class*="_cgRdT"], div[class*="_1AtV5S"], div[class*="_4sS_S_"], a[class*="_1AtV5S"]', timeout=10000)
+                except Exception:
+                    pass
+
+                # 5. Extract data using a broad heuristic
+                products_data = await page.evaluate("""
+                    () => {
+                        const results = [];
+                        const candidates = document.querySelectorAll('div, a');
+
+                        candidates.forEach(el => {
+                            if (el.children.length > 2) {
+                                const text = el.innerText || "";
+                                if (text.includes('₹') && el.querySelector('a')) {
+                                    if (el.innerText.length < 1000) {
+                                        const link = el.querySelector('a');
+                                        const title = el.querySelector('div[class*="title"], a, span') ?
+                                                    (el.querySelector('div[class*="title"], a, span').innerText) : "Unknown";
+
+                                        let price = "";
+                                        const children = el.innerText.split('\\n');
+                                        for (const line of children) {
+                                            if (line.includes('₹')) {
+                                                price = line.replace(/[^0-9.]/g, '');
+                                                break;
+                                            }
+                                        }
+
+                                        if (title && price) {
+                                            results.push({
+                                                title: title.trim(),
+                                                price: price,
+                                                url: link ? link.href : ''
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        const unique = [];
+                        const seen = new Set();
+                        results.forEach(r => {
+                            if (!seen.has(r.url)) {
+                                unique.push(r);
+                                seen.add(r.url);
+                            }
+                        });
+                        return unique;
+                    }
+                """)
+
+                await browser.close()
+                return self._map_results(products_data)
+
+            except Exception as exc:
+                await browser.close()
+                if isinstance(exc, ProviderUnavailableError):
+                    raise exc
+                raise ProviderInvalidResponseError(f"Flipkart scraping failed: {str(exc)}")
                 # Note: Flipkart selectors change frequently. These are best-effort.
                 # Using a broad selector for product cards.
                 products_data = await page.evaluate("""
