@@ -1,10 +1,10 @@
-"""Flipkart Affiliate API adapter."""
+"""Flipkart scraper adapter using Playwright."""
 
 from __future__ import annotations
 
-import os
-import httpx
+import asyncio
 from decimal import Decimal, InvalidOperation
+from playwright.async_api import async_playwright, Page
 from app.domain.comparisons.models import ProductQuery
 from app.domain.enums import Category, ChargeStatus, ProviderStatus, SourceKind, StockStatus, TaxTreatment
 from app.domain.money import Money
@@ -25,13 +25,9 @@ from app.providers.base import (
 )
 
 class FlipkartAdapter(ProviderAdapter):
-    """Integration with the official Flipkart Affiliate API."""
+    """Integration with Flipkart via Playwright scraping."""
 
     def __init__(self) -> None:
-        # Credentials read from environment variables
-        self._affiliate_id = os.environ.get("FLIPKART_AFFILIATE_ID")
-        self._affiliate_token = os.environ.get("FLIPKART_AFFILIATE_TOKEN")
-
         self._provider = Provider(
             id="flipkart",
             display_name="Flipkart",
@@ -49,59 +45,73 @@ class FlipkartAdapter(ProviderAdapter):
         return self._provider
 
     async def search(self, query: ProductQuery) -> list[ProductResult]:
-        # 1. Credential Check
-        if not self._affiliate_id or not self._affiliate_token:
-            raise ProviderUnavailableError(
-                "Flipkart API credentials (FLIPKART_AFFILIATE_ID, FLIPKART_AFFILIATE_TOKEN) are missing"
+        """Scrape search results from Flipkart."""
+        url = f"https://www.flipkart.com/search?q={query.text}"
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
+            page = await context.new_page()
 
-        # 2. Request setup
-        # Based on docs: /affiliate/search/json
-        url = "https://affiliate.flipkart.com/affiliate/search/json"
-        params = {"q": query.text}
-        headers = {
-            "Fk-Affiliate-Id": self._affiliate_id,
-            "Fk-Affiliate-Token": self._affiliate_token,
-        }
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
             try:
-                response = await client.get(url, params=params, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-            except httpx.HTTPStatusError as exc:
-                # Handle specific status codes if needed
-                if exc.response.status_code == 401:
-                    raise ProviderUnavailableError("Flipkart API token is invalid or expired")
-                raise ProviderInvalidResponseError(f"Flipkart API error: {exc.response.status_code}")
+                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+
+                # Basic check for blocking/captcha
+                if "captcha" in (await page.content()).lower():
+                    raise ProviderUnavailableError("Flipkart blocked the request with a CAPTCHA")
+
+                # Extract product containers
+                # Note: Flipkart selectors change frequently. These are best-effort.
+                # Using a broad selector for product cards.
+                products_data = await page.evaluate("""
+                    () => {
+                        const results = [];
+                        // Try multiple common selectors for product cards
+                        const cards = document.querySelectorAll('div[class*="_cgRdT"], div[class*="_1AtV5S"]');
+
+                        cards.forEach(card => {
+                            const titleEl = card.querySelector('div[class*="_4rR0S"], a[class*="_4rR0S"], div[class*="_KzT0S"]');
+                            const priceEl = card.querySelector('div[class*="_30jeq3"], span[class*="_30jeq3"]');
+                            const linkEl = card.querySelector('a');
+
+                            if (titleEl && priceEl) {
+                                results.push({
+                                    title: titleEl.innerText,
+                                    price: priceEl.innerText.replace(/[^0-9.]/g, ''),
+                                    url: linkEl ? linkEl.href : ''
+                                });
+                            }
+                        });
+                        return results;
+                    }
+                """)
+
+                await browser.close()
+                return self._map_results(products_data)
+
             except Exception as exc:
-                raise ProviderInvalidResponseError(f"Unexpected error calling Flipkart: {str(exc)}")
+                await browser.close()
+                if isinstance(exc, ProviderUnavailableError):
+                    raise exc
+                raise ProviderInvalidResponseError(f"Flipkart scraping failed: {str(exc)}")
 
-        # 3. Map results
-        # Note: The exact JSON schema is pending live capture.
-        # We use a safe mapper that returns empty if the structure is unexpected.
-        return self._map_response(data)
-
-    def _map_response(self, data: dict) -> list[ProductResult]:
-        """Maps the Flipkart JSON response to our domain model."""
+    def _map_results(self, data: list[dict]) -> list[ProductResult]:
         results: list[ProductResult] = []
-
-        # This is a skeletal mapper. It will be refined once real JSON fixtures are captured.
-        products = data.get("products", [])
-        for p in products:
+        for i, item in enumerate(data):
             try:
-                # Placeholder mapping based on expected Affiliate API fields
-                listing_id = str(p.get("id", ""))
-                if not listing_id: continue
+                listing_id = f"fk-scraped-{i}"
+                price_val = item.get("price", "0")
 
                 results.append(ProductResult(
                     provider_id=self.provider.id,
                     listing_id=listing_id,
-                    title=p.get("title", "Unknown Product"),
-                    brand=p.get("brand", "Unknown Brand"),
+                    title=item.get("title", "Unknown Product"),
+                    brand="Unknown", # Brand often requires deeper parsing
                     attributes={},
                     price=PriceBreakdown(
-                        advertised=Money(amount=Decimal(str(p.get("price", 0))), currency="INR"),
+                        advertised=Money(amount=Decimal(price_val), currency="INR"),
                         charges=(),
                         charges_complete=False,
                         tax_treatment=TaxTreatment.INCLUSIVE,
@@ -109,8 +119,8 @@ class FlipkartAdapter(ProviderAdapter):
                     availability=Availability(status=StockStatus.IN_STOCK),
                     return_policy=ReturnPolicy(returnable=True, window_days=0),
                     warranty=Warranty(months=0),
-                    seller=p.get("seller", "Flipkart"),
-                    url=p.get("url", ""),
+                    seller="Flipkart",
+                    url=item.get("url", ""),
                     provenance=self._provenance(listing_id),
                 ))
             except (ValueError, InvalidOperation, TypeError):
@@ -123,7 +133,7 @@ class FlipkartAdapter(ProviderAdapter):
         from datetime import datetime, UTC
         return DataProvenance(
             provider_id=self.provider.id,
-            source_kind=SourceKind.LIVE,
+            source_kind=SourceKind.MOCK, # Mark as mock/scraped until we have a formal source
             source_url=f"https://flipkart.com/p/{listing_id}",
             retrieved_at=datetime.now(UTC),
             ttl_seconds=3600,
