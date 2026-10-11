@@ -29,11 +29,6 @@ def build_default_registry() -> ProviderRegistry:
     # Real providers that are blocked; see docs/provider-feasibility.md.
     registry.register(
         UnavailableProviderAdapter(
-            "flipkart", "Flipkart", "awaiting affiliate registration and API token"
-        )
-    )
-    registry.register(
-        UnavailableProviderAdapter(
             "amazon-in", "Amazon India", "awaiting Creators API eligibility confirmation"
         )
     )

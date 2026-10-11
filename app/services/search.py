@@ -38,7 +38,7 @@ _RETRYABLE = frozenset({SearchState.TIMEOUT, SearchState.UNAVAILABLE})
 
 @dataclass(frozen=True)
 class SearchConfig:
-    per_provider_timeout_seconds: float = 8.0
+    per_provider_timeout_seconds: float = 40.0
     max_concurrency: int = 5
     max_retries: int = 1  # extra attempts after the first
     retry_backoff_seconds: float = 0.25

@@ -56,10 +56,24 @@ class FlipkartAdapter(ProviderAdapter):
             page = await context.new_page()
 
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                # Increased timeout to 30s to handle heavy page loads
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+                # Wait for at least one product card to appear before continuing.
+                # This ensures the JS has actually rendered the results.
+                try:
+                    await page.wait_for_selector('div[class*="_cgRdT"], div[class*="_1AtV5S"]', timeout=10000)
+                except Exception:
+                    # If no products are found, we still want to save the HTML for debugging
+                    pass
+
+                # DIAGNOSTIC: Save HTML immediately after load
+                content = await page.content()
+                with open("flipkart_debug.html", "w", encoding="utf-8") as f:
+                    f.write(content)
 
                 # Basic check for blocking/captcha
-                if "captcha" in (await page.content()).lower():
+                if "captcha" in content.lower():
                     raise ProviderUnavailableError("Flipkart blocked the request with a CAPTCHA")
 
                 # Extract product containers
